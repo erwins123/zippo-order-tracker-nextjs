@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import type { Order } from '@/lib/types'
 import { normStatusKey } from '@/lib/autoFlag'
 import Pagination from './ui/Pagination'
@@ -8,6 +8,22 @@ import Pagination from './ui/Pagination'
 const PAGE_SIZE = 50
 const HIDE_DELIVERED_KEY = 'zippo_hide_delivered'
 const DEFAULT_STORE_PREFIX = 'zippo_default_store_'
+const VISIBLE_COLS_KEY = 'zippo_visible_cols'
+
+const ALL_COLS = [
+  { k: 'date_added',      label: 'Date'         },
+  { k: 'store_name',      label: 'Store'         },
+  { k: 'order_num',       label: 'Order #'       },
+  { k: 'customer',        label: 'Customer'      },
+  { k: 'tracking_num',    label: 'Tracking #'    },
+  { k: 'courier',         label: 'Courier'       },
+  { k: 'status',          label: 'Status'        },
+  { k: 'days_in_transit', label: 'Days'          },
+  { k: 'issue_category',  label: 'Flag'          },
+  { k: 'latest_update',   label: 'Latest update' },
+  { k: '_last_checked',   label: 'Checked'       },
+]
+const DEFAULT_VISIBLE = new Set(ALL_COLS.map(c => c.k))
 
 const STATUS_PRETTY: Record<string, string> = {
   intransit: 'In Transit', delivered: 'Delivered', notfound: 'Not Found',
@@ -64,6 +80,9 @@ export default function AllOrders({
   const [hideDelivered, setHideDelivered] = useState(false)
   const [defaultStore, setDefaultStore] = useState('')
   const [bulkStatusValue, setBulkStatusValue] = useState('intransit')
+  const [visibleCols, setVisibleCols] = useState<Set<string>>(DEFAULT_VISIBLE)
+  const [colPanelOpen, setColPanelOpen] = useState(false)
+  const colPanelRef = useRef<HTMLDivElement>(null)
 
   // Load saved preferences on mount
   useEffect(() => {
@@ -71,8 +90,39 @@ export default function AllOrders({
       if (localStorage.getItem(HIDE_DELIVERED_KEY) === 'true') setHideDelivered(true)
       const ds = localStorage.getItem(DEFAULT_STORE_PREFIX + userEmail)
       if (ds) { setDefaultStore(ds); setStoreFilter(ds) }
+      const vc = localStorage.getItem(VISIBLE_COLS_KEY)
+      if (vc) {
+        const parsed = JSON.parse(vc) as string[]
+        if (Array.isArray(parsed) && parsed.length > 0) setVisibleCols(new Set(parsed))
+      }
     } catch {}
   }, [userEmail])
+
+  // Close column panel on outside click
+  useEffect(() => {
+    if (!colPanelOpen) return
+    function onMouseDown(e: MouseEvent) {
+      if (colPanelRef.current && !colPanelRef.current.contains(e.target as Node)) {
+        setColPanelOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    return () => document.removeEventListener('mousedown', onMouseDown)
+  }, [colPanelOpen])
+
+  function toggleCol(k: string) {
+    setVisibleCols(prev => {
+      const next = new Set(prev)
+      if (next.has(k)) {
+        if (next.size <= 1) return prev // always keep at least one
+        next.delete(k)
+      } else {
+        next.add(k)
+      }
+      try { localStorage.setItem(VISIBLE_COLS_KEY, JSON.stringify([...next])) } catch {}
+      return next
+    })
+  }
 
   function setAndPersistHideDelivered(v: boolean) {
     setHideDelivered(v)
@@ -175,19 +225,7 @@ export default function AllOrders({
     setSelected(new Set())
   }
 
-  const cols = [
-    { k: 'date_added',      label: 'Date'         },
-    { k: 'store_name',      label: 'Store'         },
-    { k: 'order_num',       label: 'Order #'       },
-    { k: 'customer',        label: 'Customer'      },
-    { k: 'tracking_num',    label: 'Tracking #'    },
-    { k: 'courier',         label: 'Courier'       },
-    { k: 'status',          label: 'Status'        },
-    { k: 'days_in_transit', label: 'Days'          },
-    { k: 'issue_category',  label: 'Flag'          },
-    { k: 'latest_update',   label: 'Latest update' },
-    { k: '_last_checked',   label: 'Checked'       },
-  ]
+  const cols = ALL_COLS.filter(c => visibleCols.has(c.k))
 
   return (
     <div className="view-enter">
@@ -235,7 +273,47 @@ export default function AllOrders({
           {hideDelivered ? '✓ Hiding delivered' : 'Hide delivered'}
         </button>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div ref={colPanelRef} style={{ position: 'relative' }}>
+            <button
+              className="btn-sm"
+              onClick={() => setColPanelOpen(v => !v)}
+              style={colPanelOpen ? { background: 'var(--accent-soft)', borderColor: 'var(--accent)', color: 'var(--accent-text)' } : {}}
+            >
+              Columns {visibleCols.size < ALL_COLS.length ? `(${visibleCols.size})` : ''}
+            </button>
+            {colPanelOpen && (
+              <div style={{
+                position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 200,
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.14)',
+                padding: '10px 14px', minWidth: 170,
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Show / hide columns
+                </div>
+                {ALL_COLS.map(c => (
+                  <label key={c.k} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', cursor: 'pointer', fontSize: 13, color: 'var(--text)' }}>
+                    <input
+                      type="checkbox"
+                      checked={visibleCols.has(c.k)}
+                      onChange={() => toggleCol(c.k)}
+                      style={{ accentColor: 'var(--accent)', cursor: 'pointer' }}
+                    />
+                    {c.label}
+                  </label>
+                ))}
+                <button
+                  className="btn-sm"
+                  style={{ marginTop: 10, width: '100%', justifyContent: 'center' }}
+                  onClick={() => {
+                    setVisibleCols(DEFAULT_VISIBLE)
+                    try { localStorage.removeItem(VISIBLE_COLS_KEY) } catch {}
+                  }}
+                >Reset to default</button>
+              </div>
+            )}
+          </div>
           <button className="btn-sm" onClick={onManageStores}>⚙ Stores</button>
           <button className="btn-sm" onClick={onVerifyAll} title="Pull live data from AfterShip">⚡ Verify all</button>
           <button className="btn-sm btn-primary" onClick={onAddOrder}>+ Add order</button>
@@ -302,7 +380,7 @@ export default function AllOrders({
             </thead>
             <tbody>
               {paginated.length === 0 ? (
-                <tr><td colSpan={13} className="empty">No matching orders</td></tr>
+                <tr><td colSpan={cols.length + 2} className="empty">No matching orders</td></tr>
               ) : paginated.map(o => (
                 <tr
                   key={o.id}
@@ -311,25 +389,29 @@ export default function AllOrders({
                   <td className="col-cb">
                     <input type="checkbox" checked={selected.has(o.id)} onChange={() => toggleSelect(o.id)} />
                   </td>
-                  <td>{o.date_added || '—'}</td>
-                  <td style={{ fontWeight: 500 }}>{o.store_name || '—'}</td>
-                  <td>{o.order_num || '—'}</td>
-                  <td>{o.customer || '—'}</td>
-                  <td>
-                    {o.tracking_num && o.tracking_num !== '—'
-                      ? <span className="trackLink" onClick={() => onOpenTracking(o)}>{o.tracking_num}</span>
-                      : '—'}
-                  </td>
-                  <td>{o.courier || '—'}</td>
-                  <td>{prettyStatus(o.status) || '—'}</td>
-                  <td className="col-num" style={{ fontWeight: 600 }}>{o.days_in_transit ?? '—'}</td>
-                  <td>
-                    {o.issue_category
-                      ? <span className={`badge badge-${badgeClass(o.issue_category)}`}>{o.issue_category}</span>
-                      : <span style={{ color: 'var(--muted)' }}>—</span>}
-                  </td>
-                  <td title={o.latest_update || ''}>{o.latest_update || '—'}</td>
-                  <td style={{ color: 'var(--muted)' }}>{fmtLastChecked(lastLiveCheck[o.id])}</td>
+                  {visibleCols.has('date_added') && <td>{o.date_added || '—'}</td>}
+                  {visibleCols.has('store_name') && <td style={{ fontWeight: 500 }}>{o.store_name || '—'}</td>}
+                  {visibleCols.has('order_num') && <td>{o.order_num || '—'}</td>}
+                  {visibleCols.has('customer') && <td>{o.customer || '—'}</td>}
+                  {visibleCols.has('tracking_num') && (
+                    <td>
+                      {o.tracking_num && o.tracking_num !== '—'
+                        ? <span className="trackLink" onClick={() => onOpenTracking(o)}>{o.tracking_num}</span>
+                        : '—'}
+                    </td>
+                  )}
+                  {visibleCols.has('courier') && <td>{o.courier || '—'}</td>}
+                  {visibleCols.has('status') && <td>{prettyStatus(o.status) || '—'}</td>}
+                  {visibleCols.has('days_in_transit') && <td className="col-num" style={{ fontWeight: 600 }}>{o.days_in_transit ?? '—'}</td>}
+                  {visibleCols.has('issue_category') && (
+                    <td>
+                      {o.issue_category
+                        ? <span className={`badge badge-${badgeClass(o.issue_category)}`}>{o.issue_category}</span>
+                        : <span style={{ color: 'var(--muted)' }}>—</span>}
+                    </td>
+                  )}
+                  {visibleCols.has('latest_update') && <td title={o.latest_update || ''}>{o.latest_update || '—'}</td>}
+                  {visibleCols.has('_last_checked') && <td style={{ color: 'var(--muted)' }}>{fmtLastChecked(lastLiveCheck[o.id])}</td>}
                   <td style={{ whiteSpace: 'nowrap' }}>
                     <button className="btn-sm" onClick={() => onEditOrder(o)}>Edit</button>{' '}
                     <button className="btn-sm btn-danger" onClick={() => onDeleteOrder(o.id)}>Delete</button>
