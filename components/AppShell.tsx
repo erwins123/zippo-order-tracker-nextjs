@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { normStatusKey, isAutoFlag, computeAutoFlag, AUTO_FLAG, MANUAL_STATUS_LOCK } from '@/lib/autoFlag'
 import { track17Lookup } from '@/lib/tracking'
 import type { Order, LogEntry, TrackResult } from '@/lib/types'
+import Sidebar from './Sidebar'
 import AuthScreen from './AuthScreen'
 import Dashboard from './Dashboard'
 import AllOrders from './AllOrders'
@@ -27,6 +28,14 @@ type Tab = 'dashboard' | 'allorders' | 'issues' | 'log' | 'team'
 export type ModalOrder = Order | null
 export type ScanToastData = { ts: number; by: string } | null
 
+const PAGE_TITLES: Record<Tab, string> = {
+  dashboard: 'Dashboard',
+  allorders: 'All orders',
+  issues: 'Issues',
+  log: 'Activity log',
+  team: 'Team',
+}
+
 export default function AppShell() {
   const [currentUser, setCurrentUser] = useState<{ id: string; email: string } | null>(null)
   const [currentRole, setCurrentRole] = useState<'admin' | 'member'>('member')
@@ -39,6 +48,7 @@ export default function AppShell() {
   const [subhead, setSubhead] = useState('Loading…')
   const [liveBadge, setLiveBadge] = useState('')
   const [scanToastData, setScanToastData] = useState<ScanToastData>(null)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   // Modal states
   const [orderModal, setOrderModal] = useState<{ open: boolean; order: ModalOrder }>({ open: false, order: null })
@@ -46,7 +56,7 @@ export default function AppShell() {
   const [verifyOpen, setVerifyOpen] = useState(false)
   const [trackDetailOrder, setTrackDetailOrder] = useState<Order | null>(null)
 
-  // Verify state (lifted so modal and background share it)
+  // Verify state
   const [verifyRunning, setVerifyRunning] = useState(false)
   const [verifyRows, setVerifyRows] = useState<{ order: Order; result: TrackResult | null }[]>([])
   const [verifyProgress, setVerifyProgress] = useState({ checked: 0, total: 0, text: '' })
@@ -141,7 +151,7 @@ export default function AppShell() {
 
   function updateSubhead(o: Order[]) {
     const open = o.filter(x => x.has_issue && x.my_status !== 'resolved').length
-    setSubhead(`${o.length} order rows · ${new Set(o.map(x => x.store_name)).size} stores · ${open} open issues tracked`)
+    setSubhead(`${o.length} orders · ${new Set(o.map(x => x.store_name)).size} stores · ${open} open issues`)
   }
 
   // ----- Realtime -----
@@ -149,9 +159,7 @@ export default function AppShell() {
     if (!currentUser) return
     const channel = supabase
       .channel('app-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        loadAll()
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { loadAll() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_log' }, () => {
         supabase.from('activity_log').select('*').order('ts', { ascending: false }).limit(200).then(({ data }) => {
           if (data) setLogRows(data as LogEntry[])
@@ -194,6 +202,23 @@ export default function AppShell() {
     const { error } = await supabase.from('orders').delete().eq('id', id)
     if (error) { alert('Delete failed: ' + error.message); await loadAll(); return }
     await addLog(`${o.store_name} · ${o.customer || '—'} (${o.tracking_num || '—'}): order row deleted`)
+  }
+
+  // ----- Bulk operations -----
+  async function bulkDeleteOrders(ids: string[]) {
+    setOrders(prev => { const next = prev.filter(x => !ids.includes(x.id)); updateSubhead(next); return next })
+    await Promise.all(ids.map(id => supabase.from('orders').delete().eq('id', id)))
+    await addLog(`Bulk deleted ${ids.length} order rows`)
+  }
+
+  async function bulkUpdateOrders(ids: string[], patch: Partial<Order>) {
+    const fullPatch = { ...patch, updated_by: whoAmI(), updated_at: new Date().toISOString() }
+    setOrders(prev => {
+      const next = prev.map(o => ids.includes(o.id) ? { ...o, ...fullPatch } : o)
+      updateSubhead(next)
+      return next
+    })
+    await Promise.all(ids.map(id => supabase.from('orders').update(fullPatch).eq('id', id)))
   }
 
   // ----- Write live result back -----
@@ -284,7 +309,7 @@ export default function AppShell() {
     })
 
     setVerifyProgress({ checked: 0, total: targets.length, text: `Checking 0 of ${targets.length}…` })
-    setLiveBadge(`Checking live AfterShip data in the background… 0 / ${targets.length}`)
+    setLiveBadge(`Checking live AfterShip data… 0 / ${targets.length}`)
 
     let ok = 0, failed = 0
     const newRows: { order: Order; result: TrackResult | null }[] = []
@@ -314,14 +339,14 @@ export default function AppShell() {
 
     if (!verifyStopRef.current) {
       await supabase.from('app_settings').upsert({ key: 'last_live_scan', value: JSON.stringify({ ts: Date.now(), by: scanBy }), updated_at: new Date().toISOString() })
-      setLiveBadge(`✓ Live AfterShip data refreshed at ${stamp} (${ok}/${targets.length} OK) — click to view results`)
+      setLiveBadge(`✓ Live data refreshed at ${stamp} (${ok}/${targets.length} OK)`)
       await runAutoFlag(true)
     } else {
-      setLiveBadge(`Live check stopped early (${checked}/${targets.length}) at ${stamp} — click to view results`)
+      setLiveBadge(`Live check stopped at ${checked}/${targets.length} (${stamp})`)
     }
 
     setVerifySummary(`${ok} retrieved · ${failed} couldn't be checked live${skipped ? ` · ${skipped} skipped` : ''}`)
-    setVerifyProgress({ checked, total: targets.length, text: verifyStopRef.current ? `Stopped after ${checked} of ${targets.length}.` : `Done — pulled live data for ${checked} of ${targets.length} from AfterShip.` })
+    setVerifyProgress({ checked, total: targets.length, text: verifyStopRef.current ? `Stopped after ${checked} of ${targets.length}.` : `Done — pulled live data for ${checked} of ${targets.length}.` })
     setVerifyRunning(false)
   }
 
@@ -343,12 +368,12 @@ export default function AppShell() {
       } else {
         setTimeout(() => setScanToastData({ ts: scanTs, by: scanBy }), 800)
         const stamp = new Date(scanTs).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
-        setLiveBadge(`✓ Tracking data up to date · last refreshed by ${scanBy} at ${stamp}`)
+        setLiveBadge(`✓ Up to date · refreshed by ${scanBy} at ${stamp}`)
       }
     } catch {}
   }
 
-  // ----- All store names (list + from orders) -----
+  // ----- All store names -----
   function allStoreNames() {
     const fromOrders = [...new Set(orders.map(o => o.store_name).filter(Boolean) as string[])]
     return [...new Set([...storeNameList, ...fromOrders])].sort(naturalStoreCompare)
@@ -366,78 +391,88 @@ export default function AppShell() {
     return <AuthScreen theme={theme} toggleTheme={toggleTheme} />
   }
 
+  const openIssueCount = orders.filter(o => o.has_issue && o.my_status !== 'resolved').length
+
   return (
-    <>
-      <div className="titlewrap">
-        <h1>
+    <div className="app-shell">
+      <Sidebar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        userEmail={currentUser.email}
+        currentRole={currentRole}
+        theme={theme}
+        toggleTheme={toggleTheme}
+        onSignOut={signOut}
+        openIssueCount={openIssueCount}
+        mobileOpen={mobileMenuOpen}
+        onCloseMobile={() => setMobileMenuOpen(false)}
+        liveBadge={liveBadge}
+        onOpenVerify={() => setVerifyOpen(true)}
+      />
+
+      <div className="main-content">
+        <div className="main-header">
+          <button className="btn-icon mobile-menu-btn" onClick={() => setMobileMenuOpen(true)}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+              <line x1="3" y1="6" x2="21" y2="6"/>
+              <line x1="3" y1="12" x2="21" y2="12"/>
+              <line x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
+          </button>
+          <span className="main-header-title">{PAGE_TITLES[activeTab]}</span>
+          {activeTab === 'issues' && openIssueCount > 0 && (
+            <span className="main-header-badge" style={{ background: 'var(--bad-bg)', color: 'var(--bad)', border: '1px solid var(--bad-border)' }}>
+              {openIssueCount} open
+            </span>
+          )}
+        </div>
+
+        <div className="stat-strip">
           <span className="live-dot" />
-          ZIPPO CLUB ORDER TRACKER{' '}
-          <span style={{ fontSize: 12, fontWeight: 400, fontFamily: 'Inter, sans-serif', color: 'var(--muted)' }}>— shared, live</span>
-        </h1>
-        <div className="topRight">
-          <div className="userChip">
-            <span className="av">{(currentUser.email || '?').charAt(0).toUpperCase()}</span>
-            <span>{currentUser.email}</span>
-            <button onClick={signOut}>Sign out</button>
-          </div>
-          <div className="themeToggle" onClick={toggleTheme}>
-            <span className="dot" />
-            <span>{theme === 'dark' ? 'Dark mode' : 'Light mode'}</span>
-          </div>
+          <span>{subhead}</span>
+          <span style={{ marginLeft: 'auto', color: '#22c55e', fontWeight: 500, fontSize: 11 }}>live · synced with your team</span>
+        </div>
+
+        <div className="page-content">
+          {activeTab === 'dashboard' && (
+            <Dashboard orders={orders} onNavigate={(tab) => setActiveTab(tab as Tab)} />
+          )}
+          {activeTab === 'allorders' && (
+            <AllOrders
+              orders={orders}
+              lastLiveCheck={lastLiveCheck}
+              allStoreNames={allStoreNames()}
+              userEmail={currentUser.email}
+              onAddOrder={() => setOrderModal({ open: true, order: null })}
+              onEditOrder={o => setOrderModal({ open: true, order: o })}
+              onDeleteOrder={deleteOrder}
+              onOpenTracking={o => setTrackDetailOrder(o)}
+              onVerifyAll={() => { setVerifyOpen(true); if (!verifyRunning) runVerifyAll() }}
+              onManageStores={() => setStoreManageOpen(true)}
+              onBulkDelete={bulkDeleteOrders}
+              onBulkUpdateStatus={(ids, status) => bulkUpdateOrders(ids, { status })}
+            />
+          )}
+          {activeTab === 'issues' && (
+            <Issues
+              orders={orders}
+              userEmail={currentUser.email}
+              onUpdateOrder={updateOrder}
+              onAddLog={addLog}
+              onRunAutoFlag={async () => { await runAutoFlag(false) }}
+              onManageStores={() => setStoreManageOpen(true)}
+              onOpenTracking={o => setTrackDetailOrder(o)}
+              allStoreNames={allStoreNames()}
+              onBulkDelete={bulkDeleteOrders}
+              onBulkSetMyStatus={(ids, status) => bulkUpdateOrders(ids, { my_status: status })}
+            />
+          )}
+          {activeTab === 'log' && <ActivityLog logRows={logRows} />}
+          {activeTab === 'team' && currentRole === 'admin' && (
+            <Team currentUserId={currentUser.id} onAddLog={addLog} />
+          )}
         </div>
       </div>
-
-      <div className="sub" style={{ marginBottom: 4 }}>{subhead} <span style={{ color: '#16a34a' }}>● live — synced with your team</span></div>
-      {liveBadge && (
-        <div className="sub" style={{ margin: '2px 0 18px', cursor: 'pointer' }} onClick={() => setVerifyOpen(true)}>
-          {liveBadge}
-        </div>
-      )}
-
-      <div className="tabs">
-        {(['dashboard', 'allorders', 'issues', 'log'] as Tab[]).map(t => (
-          <div key={t} className={`tab${activeTab === t ? ' active' : ''}`} onClick={() => setActiveTab(t)}>
-            {t === 'dashboard' ? 'Dashboard' : t === 'allorders' ? 'All orders' : t === 'issues' ? 'Issues' : 'Activity log'}
-          </div>
-        ))}
-        {currentRole === 'admin' && (
-          <div className={`tab${activeTab === 'team' ? ' active' : ''}`} onClick={() => setActiveTab('team')}>Team</div>
-        )}
-      </div>
-
-      {activeTab === 'dashboard' && (
-        <Dashboard orders={orders} onNavigate={(tab, filters) => { setActiveTab(tab as Tab) }} />
-      )}
-      {activeTab === 'allorders' && (
-        <AllOrders
-          orders={orders}
-          lastLiveCheck={lastLiveCheck}
-          onAddOrder={() => setOrderModal({ open: true, order: null })}
-          onEditOrder={o => setOrderModal({ open: true, order: o })}
-          onDeleteOrder={deleteOrder}
-          onOpenTracking={o => setTrackDetailOrder(o)}
-          onVerifyAll={() => { setVerifyOpen(true); if (!verifyRunning) runVerifyAll() }}
-          onManageStores={() => setStoreManageOpen(true)}
-          allStoreNames={allStoreNames()}
-        />
-      )}
-      {activeTab === 'issues' && (
-        <Issues
-          orders={orders}
-          onUpdateOrder={updateOrder}
-          onAddLog={addLog}
-          onRunAutoFlag={async () => { await runAutoFlag(false) }}
-          onManageStores={() => setStoreManageOpen(true)}
-          onOpenTracking={o => setTrackDetailOrder(o)}
-          allStoreNames={allStoreNames()}
-        />
-      )}
-      {activeTab === 'log' && <ActivityLog logRows={logRows} />}
-      {activeTab === 'team' && currentRole === 'admin' && (
-        <Team currentUserId={currentUser.id} onAddLog={addLog} />
-      )}
-
-      <footer>Shared live tracker — backed by a team database. Status changes and notes sync for everyone in real time.</footer>
 
       <OrderModal
         open={orderModal.open}
@@ -495,6 +530,6 @@ export default function AppShell() {
       )}
 
       <ScanToast data={scanToastData} onDismiss={() => setScanToastData(null)} />
-    </>
+    </div>
   )
 }
