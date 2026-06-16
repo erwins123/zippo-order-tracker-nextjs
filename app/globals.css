@@ -362,7 +362,24 @@ button.primary:hover { background: var(--accent-hover); border-color: var(--acce
 button.btn-danger { color: var(--bad); border-color: var(--bad-border); background: var(--bad-bg); }
 button.btn-danger:hover { background: #fecaca; }
 button:disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
-button.btn-sm { padding: 4px 9px; font-size: 11.5px; }
+button.btn-sm, a.btn-sm {
+  padding: 4px 9px;
+  font-size: 11.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background 0.12s, border-color 0.12s;
+}
+a.btn-sm:hover { background: var(--surface-2); border-color: var(--border-2); }
 button.btn-icon { padding: 5px 8px; }
 
 /* ===== FORM CONTROLS ===== */
