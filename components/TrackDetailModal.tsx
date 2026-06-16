@@ -157,10 +157,18 @@ export default function TrackDetailModal({ order, orders, onClose, onEdit, onWri
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
           <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button onClick={() => window.open(`https://t.17track.net/en#nums=${encodeURIComponent(order.tracking_num || '')}`, '_blank', 'noopener')}>Open in 17TRACK ↗</button>
-            <button onClick={() => window.open(`https://track.aftership.com/${encodeURIComponent(order.tracking_num || '')}`, '_blank', 'noopener')}>Open in AfterShip ↗</button>
-            <button onClick={copyTracking}>Copy tracking #</button>
-            <button onClick={() => { onClose(); onEdit(currentOrder) }}>✎ Edit order</button>
+            <a
+              href={`https://t.17track.net/en#nums=${encodeURIComponent(order.tracking_num || '')}`}
+              target="_blank" rel="noopener noreferrer"
+              className="btn-sm"
+            >Open in 17TRACK ↗</a>
+            <a
+              href={`https://track.aftership.com/${encodeURIComponent(order.tracking_num || '')}`}
+              target="_blank" rel="noopener noreferrer"
+              className="btn-sm"
+            >Open in AfterShip ↗</a>
+            <button className="btn-sm" onClick={copyTracking}>Copy tracking #</button>
+            <button className="btn-sm" onClick={() => { onClose(); onEdit(currentOrder) }}>✎ Edit order</button>
           </span>
           <button className="primary" onClick={onClose}>Close</button>
         </div>
