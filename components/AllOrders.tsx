@@ -257,13 +257,27 @@ export default function AllOrders({
           {statuses.map(s => <option key={s} value={s}>{prettyStatus(s)}</option>)}
         </select>
 
-        <input
-          type="text"
-          value={search}
-          onChange={e => { setSearch(e.target.value); setPage(1) }}
-          placeholder="Search customer, order #, tracking…"
-          style={{ width: 220 }}
-        />
+        <div style={{ position: 'relative', width: 220 }}>
+          <input
+            type="text"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1) }}
+            placeholder="Search customer, order #, tracking…"
+            style={{ width: '100%', paddingRight: search ? 26 : undefined }}
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => { setSearch(''); setPage(1) }}
+              title="Clear search"
+              style={{
+                position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+                border: 'none', background: 'none', cursor: 'pointer', padding: 2,
+                color: 'var(--muted)', fontSize: 14, lineHeight: 1, display: 'flex',
+              }}
+            >✕</button>
+          )}
+        </div>
 
         <button
           className="btn-sm"

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import type { Order } from '@/lib/types'
 import Pagination from './ui/Pagination'
 
@@ -8,6 +8,18 @@ const PAGE_SIZE = 50
 
 function badgeClass(c: string | null) {
   return (c || '').toUpperCase().replace(/[^A-Z]+/g, '_').replace(/^_|_$/g, '') || 'empty'
+}
+
+function daysOpen(o: Order): number {
+  if (!o.date_added) return 0
+  const ms = Date.now() - new Date(o.date_added).getTime()
+  return Math.max(0, Math.floor(ms / 86400000))
+}
+
+function ageStyle(days: number): React.CSSProperties {
+  if (days >= 15) return { color: 'var(--bad)', fontWeight: 700 }
+  if (days >= 7)  return { color: 'var(--warn)', fontWeight: 600 }
+  return { color: 'var(--muted)' }
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -21,6 +33,8 @@ function statusLabel(s: string | null) { return STATUS_LABELS[s || ''] || s || '
 type Props = {
   orders: Order[]
   userEmail: string
+  navStore?: string
+  navSearch?: string
   allStoreNames: string[]
   onUpdateOrder: (id: string, patch: Partial<Order>) => Promise<void>
   onAddLog: (text: string) => Promise<void>
@@ -32,7 +46,7 @@ type Props = {
 }
 
 export default function Issues({
-  orders, onUpdateOrder, onAddLog, onRunAutoFlag,
+  orders, navStore, navSearch, onUpdateOrder, onAddLog, onRunAutoFlag,
   onManageStores, onOpenTracking, onBulkDelete, onBulkSetMyStatus,
 }: Props) {
   const [storeFilter, setStoreFilter] = useState('')
@@ -43,6 +57,16 @@ export default function Issues({
   const [sortDir, setSortDir] = useState<1 | -1>(-1)
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+
+  // Jump to a store when navigating from Dashboard
+  useEffect(() => {
+    if (navStore) { setStoreFilter(navStore); setPage(1) }
+  }, [navStore])
+
+  // Jump to a specific order when navigating from the weekly email
+  useEffect(() => {
+    if (navSearch) { setSearch(navSearch); setPage(1) }
+  }, [navSearch])
   const [autoFlagStatus, setAutoFlagStatus] = useState('')
   const [saveHint, setSaveHint] = useState(false)
   const saveHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -159,13 +183,13 @@ export default function Issues({
   }
 
   const cols = [
-    { k: 'date_added',      label: 'Date'     },
+    { k: 'date_added',      label: 'Age'      },
     { k: 'store_name',      label: 'Store'    },
     { k: 'order_num',       label: 'Order #'  },
     { k: 'customer',        label: 'Customer' },
     { k: 'tracking_num',    label: 'Tracking' },
     { k: 'courier',         label: 'Courier'  },
-    { k: 'days_in_transit', label: 'Days'     },
+    { k: 'days_in_transit', label: 'Transit'  },
     { k: 'issue_category',  label: 'Issue'    },
   ]
 
@@ -271,7 +295,11 @@ export default function Issues({
                   <td className="col-cb">
                     <input type="checkbox" checked={selected.has(o.id)} onChange={() => toggleSelect(o.id)} />
                   </td>
-                  <td>{o.date_added || '—'}</td>
+                  <td>
+                    <span style={ageStyle(daysOpen(o))} title={o.date_added || ''}>
+                      {daysOpen(o)}d
+                    </span>
+                  </td>
                   <td style={{ fontWeight: 500 }}>{o.store_name || '—'}</td>
                   <td>{o.order_num || '—'}</td>
                   <td>{o.customer || '—'}</td>

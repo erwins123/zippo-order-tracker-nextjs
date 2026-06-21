@@ -49,6 +49,8 @@ export default function AppShell() {
   const [liveBadge, setLiveBadge] = useState('')
   const [scanToastData, setScanToastData] = useState<ScanToastData>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [issueNavStore, setIssueNavStore] = useState('')
+  const [issueNavSearch, setIssueNavSearch] = useState('')
 
   // Modal states
   const [orderModal, setOrderModal] = useState<{ open: boolean; order: ModalOrder }>({ open: false, order: null })
@@ -81,6 +83,16 @@ export default function AppShell() {
   }
 
   function toggleTheme() { applyTheme(theme === 'dark' ? 'light' : 'dark') }
+
+  // ----- Deep link from email (?tab=issues&q=<order or tracking #>) -----
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const tab = params.get('tab')
+    const q = params.get('q')
+    if (tab && PAGE_TITLES[tab as Tab]) setActiveTab(tab as Tab)
+    if (q) setIssueNavSearch(q)
+    if (tab || q) window.history.replaceState({}, '', window.location.pathname)
+  }, [])
 
   // ----- Store list -----
   useEffect(() => {
@@ -435,7 +447,13 @@ export default function AppShell() {
 
         <div className="page-content">
           {activeTab === 'dashboard' && (
-            <Dashboard orders={orders} onNavigate={(tab) => setActiveTab(tab as Tab)} />
+            <Dashboard
+              orders={orders}
+              onNavigate={(tab, store) => {
+                setActiveTab(tab as Tab)
+                if (store) setIssueNavStore(store)
+              }}
+            />
           )}
           {activeTab === 'allorders' && (
             <AllOrders
@@ -457,6 +475,8 @@ export default function AppShell() {
             <Issues
               orders={orders}
               userEmail={currentUser.email}
+              navStore={issueNavStore}
+              navSearch={issueNavSearch}
               onUpdateOrder={updateOrder}
               onAddLog={addLog}
               onRunAutoFlag={async () => { await runAutoFlag(false) }}
