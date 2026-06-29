@@ -14,10 +14,19 @@ function prettyStatus(s: string | null) { return STATUS_PRETTY[normStatusKey(s)]
 
 function statusColor(label: string): string {
   const l = label.toLowerCase()
-  if (l.includes('deliver')) return 'var(--good)'
+  if (l.includes('deliver') && !l.includes('out')) return 'var(--good)'
   if (l.includes('transit') || l.includes('out for')) return 'var(--info)'
   if (l.includes('not found') || l.includes('exception') || l.includes('alert') || l.includes('undelivered') || l.includes('returned')) return 'var(--bad)'
   if (l.includes('pending') || l.includes('info received') || l.includes('on hold')) return 'var(--warn)'
+  return 'var(--muted)'
+}
+
+// Maps a stat-card color class to its accent variable (drives the dot)
+function dotColor(cls: string): string {
+  if (cls === 'green') return 'var(--good)'
+  if (cls === 'red')   return 'var(--bad)'
+  if (cls === 'amber') return 'var(--warn)'
+  if (cls === 'blue')  return 'var(--info)'
   return 'var(--muted)'
 }
 
@@ -28,16 +37,16 @@ function HBar({ label, count, max, color, onClick }: {
   return (
     <div
       onClick={onClick}
-      style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7, cursor: onClick ? 'pointer' : undefined }}
+      style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 11, cursor: onClick ? 'pointer' : undefined }}
       title={onClick ? `Click to view issues for ${label}` : undefined}
     >
-      <div style={{ width: 130, fontSize: 11.5, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right', flexShrink: 0 }}>
+      <div style={{ width: 118, fontSize: 12, fontWeight: 500, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right', flexShrink: 0 }}>
         {label}
       </div>
-      <div style={{ flex: 1, background: 'var(--surface-2)', borderRadius: 4, height: 14, overflow: 'hidden', minWidth: 0, border: '1px solid var(--border)' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 3, minWidth: count > 0 ? 4 : 0 }} />
+      <div style={{ flex: 1, background: 'var(--surface-2)', borderRadius: 6, height: 18, overflow: 'hidden', minWidth: 0, border: '1px solid var(--border)' }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 5, minWidth: count > 0 ? 6 : 0 }} />
       </div>
-      <div style={{ width: 28, fontSize: 11.5, color: 'var(--muted)', textAlign: 'right', flexShrink: 0, fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
+      <div style={{ width: 24, fontSize: 12.5, color: 'var(--text)', textAlign: 'right', flexShrink: 0, fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>
         {count}
       </div>
     </div>
@@ -59,7 +68,7 @@ export default function Dashboard({ orders, onNavigate }: Props) {
   const transit   = orders.filter(o => normStatusKey(o.status) === 'intransit').length
 
   const cards = [
-    { n: orders.length,   l: 'Total orders',          cls: 'blue',  tab: 'allorders' },
+    { n: orders.length,   l: 'Total orders',          cls: 'gray',  tab: 'allorders' },
     { n: delivered,       l: 'Delivered',              cls: 'green', tab: 'allorders' },
     { n: transit,         l: 'In transit',             cls: 'blue',  tab: 'allorders' },
     { n: flagged.length,  l: 'Flagged — needs review', cls: 'red',   tab: 'issues'    },
@@ -96,6 +105,12 @@ export default function Dashboard({ orders, onNavigate }: Props) {
       <div className="cards">
         {cards.map((c, i) => (
           <div key={i} className={`card ${c.cls} clickable`} onClick={() => onNavigate(c.tab)}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 }}>
+              <span style={{ width: 9, height: 9, borderRadius: 3, background: dotColor(c.cls) }} />
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.45 }}>
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+            </div>
             <div className="num">{c.n}</div>
             <div className="lbl">{c.l}</div>
           </div>
@@ -103,9 +118,9 @@ export default function Dashboard({ orders, onNavigate }: Props) {
       </div>
 
       {/* Charts row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 16 }}>
         <div className="section" style={{ marginBottom: 0 }}>
-          <h2 style={{ marginBottom: 14 }}>
+          <h2 style={{ marginBottom: 16 }}>
             Open issues by store
             {issueChartData.length === 0 && (
               <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--good)', marginLeft: 8 }}>✓ All clear</span>
@@ -119,14 +134,14 @@ export default function Dashboard({ orders, onNavigate }: Props) {
               label={d.store}
               count={d.count}
               max={maxIssues}
-              color={d.count >= 6 ? 'var(--bad)' : d.count >= 3 ? 'var(--warn)' : 'var(--accent)'}
+              color={d.count >= 5 ? 'var(--bad)' : d.count >= 3 ? 'var(--warn)' : 'var(--accent)'}
               onClick={() => onNavigate('issues', d.store)}
             />
           ))}
         </div>
 
         <div className="section" style={{ marginBottom: 0 }}>
-          <h2 style={{ marginBottom: 14 }}>Orders by status</h2>
+          <h2 style={{ marginBottom: 16 }}>Orders by status</h2>
           {statusChartData.map(([label, count]) => (
             <HBar
               key={label}
@@ -140,12 +155,12 @@ export default function Dashboard({ orders, onNavigate }: Props) {
       </div>
 
       {/* By store table */}
-      <div className="section">
-        <h2>
+      <div className="section" style={{ padding: 0, overflow: 'hidden' }}>
+        <h2 style={{ padding: '18px 20px 0' }}>
           By store
           <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 12, marginLeft: 8 }}>— click a row to filter issues</span>
         </h2>
-        <div className="tablewrap">
+        <div className="tablewrap" style={{ border: 'none', borderRadius: 0, boxShadow: 'none', marginTop: 14 }}>
           <table>
             <thead>
               <tr>
@@ -173,8 +188,8 @@ export default function Dashboard({ orders, onNavigate }: Props) {
                     style={{ cursor: 'pointer' }}
                     title={`View issues for ${s}`}
                   >
-                    <td style={{ fontWeight: 500 }}>{s}</td>
-                    <td className="col-num">{rows.length}</td>
+                    <td style={{ fontWeight: 600 }}>{s}</td>
+                    <td className="col-num" style={{ color: 'var(--text-2)' }}>{rows.length}</td>
                     <td className="col-num" style={{ color: del ? 'var(--good)' : 'var(--muted)' }}>{del}</td>
                     <td className="col-num" style={{ color: tr ? 'var(--info)' : 'var(--muted)' }}>{tr}</td>
                     <td className="col-num" style={{ color: op ? 'var(--bad)' : 'var(--muted)', fontWeight: op ? 700 : 400 }}>{op || '—'}</td>

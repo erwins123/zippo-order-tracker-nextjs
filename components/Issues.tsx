@@ -10,6 +10,15 @@ function badgeClass(c: string | null) {
   return (c || '').toUpperCase().replace(/[^A-Z]+/g, '_').replace(/^_|_$/g, '') || 'empty'
 }
 
+// Severity accent for the card's left border, derived from the issue category
+function sevColor(cat: string | null): string {
+  const c = (cat || '').toUpperCase()
+  if (c.includes('RETURN')) return 'var(--violet)'
+  if (c.includes('STUCK') || c.includes('DELAY') || c.includes('DAYS')) return 'var(--warn)'
+  if (!c) return 'var(--border-2)'
+  return 'var(--bad)'
+}
+
 function daysOpen(o: Order): number {
   if (!o.date_added) return 0
   const ms = Date.now() - new Date(o.date_added).getTime()
@@ -19,7 +28,7 @@ function daysOpen(o: Order): number {
 function ageStyle(days: number): React.CSSProperties {
   if (days >= 15) return { color: 'var(--bad)', fontWeight: 700 }
   if (days >= 7)  return { color: 'var(--warn)', fontWeight: 600 }
-  return { color: 'var(--muted)' }
+  return { color: 'var(--muted)', fontWeight: 500 }
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -99,12 +108,6 @@ export default function Issues({
     [sorted, page]
   )
 
-  function handleSort(k: string) {
-    if (sortKey === k) setSortDir(d => d === 1 ? -1 : 1)
-    else { setSortKey(k); setSortDir(-1) }
-    setPage(1)
-  }
-
   function flashSaved() {
     setSaveHint(true)
     if (saveHintTimer.current) clearTimeout(saveHintTimer.current)
@@ -182,17 +185,6 @@ export default function Issues({
     flashSaved()
   }
 
-  const cols = [
-    { k: 'date_added',      label: 'Age'      },
-    { k: 'store_name',      label: 'Store'    },
-    { k: 'order_num',       label: 'Order #'  },
-    { k: 'customer',        label: 'Customer' },
-    { k: 'tracking_num',    label: 'Tracking' },
-    { k: 'courier',         label: 'Courier'  },
-    { k: 'days_in_transit', label: 'Transit'  },
-    { k: 'issue_category',  label: 'Issue'    },
-  ]
-
   return (
     <div className="view-enter">
       {/* Filter bar */}
@@ -216,6 +208,16 @@ export default function Issues({
           <option value="watching">Watching</option>
           <option value="contacted">Contacted customer</option>
           <option value="resolved">Resolved</option>
+        </select>
+
+        <select
+          value={`${sortKey}:${sortDir}`}
+          onChange={e => { const [k, d] = e.target.value.split(':'); setSortKey(k); setSortDir(Number(d) as 1 | -1); setPage(1) }}
+          title="Sort issues"
+        >
+          <option value="days_in_transit:-1">Longest in transit</option>
+          <option value="date_added:1">Oldest issue first</option>
+          <option value="store_name:1">Store A–Z</option>
         </select>
 
         <input
@@ -263,89 +265,99 @@ export default function Issues({
         </div>
       )}
 
-      {/* Table */}
-      <div className="tablewrap">
-        <div className="tablewrap-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th className="col-cb">
-                  <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAll} />
-                </th>
-                {cols.map(c => (
-                  <th
-                    key={c.k}
-                    className={sortKey === c.k ? (sortDir === 1 ? 'sort-asc' : 'sort-desc') : 'sortable'}
-                    onClick={() => handleSort(c.k)}
-                  >{c.label}</th>
-                ))}
-                <th>My status</th>
-                <th>Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginated.length === 0 ? (
-                <tr><td colSpan={11} className="empty">No flagged issues match these filters</td></tr>
-              ) : paginated.map(o => (
-                <tr
-                  key={o.id}
-                  className={o.my_status === 'resolved' ? 'resolved' : ''}
-                  style={selected.has(o.id) ? { background: 'var(--accent-soft)' } : undefined}
-                >
-                  <td className="col-cb">
-                    <input type="checkbox" checked={selected.has(o.id)} onChange={() => toggleSelect(o.id)} />
-                  </td>
-                  <td>
-                    <span style={ageStyle(daysOpen(o))} title={o.date_added || ''}>
-                      {daysOpen(o)}d
-                    </span>
-                  </td>
-                  <td style={{ fontWeight: 500 }}>{o.store_name || '—'}</td>
-                  <td>{o.order_num || '—'}</td>
-                  <td>{o.customer || '—'}</td>
-                  <td>
-                    {o.tracking_num && o.tracking_num !== '—'
-                      ? <span className="trackLink" onClick={() => onOpenTracking(o)}>{o.tracking_num}</span>
-                      : '—'}
-                  </td>
-                  <td>{o.courier || '—'}</td>
-                  <td className="col-num" style={{ fontWeight: 600 }}>{o.days_in_transit ?? '—'}</td>
-                  <td>
-                    <span className={`badge badge-${badgeClass(o.issue_category)}`}>{o.issue_category || '—'}</span>
-                  </td>
-                  <td>
-                    <select
-                      className={`statusSelect ${o.my_status || 'open'}`}
-                      defaultValue={o.my_status || 'open'}
-                      onChange={e => handleStatusChange(o, e.target.value)}
-                    >
-                      <option value="open">Open</option>
-                      <option value="watching">Watching</option>
-                      <option value="contacted">Contacted customer</option>
-                      <option value="resolved">Resolved</option>
-                    </select>
-                  </td>
-                  <td>
-                    <input
-                      type="text"
-                      defaultValue={o.notes || ''}
-                      placeholder="Add a note…"
-                      style={{ width: 180, fontSize: 12 }}
-                      onChange={e => handleNotesChange(o, e.target.value)}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Issue cards */}
+      {paginated.length === 0 ? (
+        <div className="section" style={{ textAlign: 'center', padding: 48 }}>
+          <div style={{
+            width: 46, height: 46, borderRadius: '50%', background: 'var(--good-bg)',
+            border: '1px solid var(--good-border)', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', margin: '0 auto 14px',
+          }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--good)" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 5 }}>All clear</div>
+          <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>No flagged issues match these filters.</div>
         </div>
-        <Pagination
-          total={sorted.length}
-          page={page}
-          pageSize={PAGE_SIZE}
-          onChange={p => { setPage(p); setSelected(new Set()) }}
-        />
-      </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {paginated.map(o => (
+            <div
+              key={o.id}
+              style={{
+                background: selected.has(o.id) ? 'var(--accent-soft)' : 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderLeft: `3px solid ${sevColor(o.issue_category)}`,
+                borderRadius: 12,
+                padding: '14px 16px',
+                boxShadow: 'var(--shadow)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 16,
+                flexWrap: 'wrap',
+                opacity: o.my_status === 'resolved' ? 0.55 : 1,
+              }}
+            >
+              <input type="checkbox" checked={selected.has(o.id)} onChange={() => toggleSelect(o.id)} />
+
+              <div style={{ minWidth: 170, flex: '1 1 220px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: 700, fontSize: 13.5 }}>{o.customer || '—'}</span>
+                  <span className={`badge badge-${badgeClass(o.issue_category)}`}>{o.issue_category || '—'}</span>
+                  <span style={{ ...ageStyle(daysOpen(o)), fontSize: 11 }} title={o.date_added || ''}>{daysOpen(o)}d open</span>
+                </div>
+                <div style={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 500 }}>
+                  {o.store_name || '—'} · {o.order_num || '—'} ·{' '}
+                  {o.tracking_num && o.tracking_num !== '—'
+                    ? <span className="trackLink" onClick={() => onOpenTracking(o)}>{o.tracking_num}</span>
+                    : '—'} · {o.courier || '—'}
+                </div>
+              </div>
+
+              <div style={{ flex: '1 1 150px', minWidth: 130 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-2)' }}>{o.latest_update || '—'}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                  {o.days_in_transit ?? '—'} days in transit
+                </div>
+              </div>
+
+              <input
+                type="text"
+                defaultValue={o.notes || ''}
+                placeholder="Add a note…"
+                style={{ width: 170, fontSize: 12 }}
+                onChange={e => handleNotesChange(o, e.target.value)}
+              />
+
+              <select
+                className={`statusSelect ${o.my_status || 'open'}`}
+                defaultValue={o.my_status || 'open'}
+                onChange={e => handleStatusChange(o, e.target.value)}
+              >
+                <option value="open">Open</option>
+                <option value="watching">Watching</option>
+                <option value="contacted">Contacted customer</option>
+                <option value="resolved">Resolved</option>
+              </select>
+
+              <button className="btn-sm" onClick={() => onOpenTracking(o)}>Track</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Pagination (only renders when results exceed one page) */}
+      {sorted.length > PAGE_SIZE && (
+        <div className="tablewrap" style={{ marginTop: 12 }}>
+          <Pagination
+            total={sorted.length}
+            page={page}
+            pageSize={PAGE_SIZE}
+            onChange={p => { setPage(p); setSelected(new Set()) }}
+          />
+        </div>
+      )}
     </div>
   )
 }

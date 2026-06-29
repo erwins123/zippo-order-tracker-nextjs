@@ -35,6 +35,15 @@ const STATUS_PRETTY: Record<string, string> = {
 }
 function prettyStatus(s: string | null) { return STATUS_PRETTY[normStatusKey(s)] || s || '' }
 
+function statusColor(label: string): string {
+  const l = label.toLowerCase()
+  if (l.includes('deliver') && !l.includes('out')) return 'var(--good)'
+  if (l.includes('transit') || l.includes('out for')) return 'var(--info)'
+  if (l.includes('not found') || l.includes('exception') || l.includes('alert') || l.includes('undeliver') || l.includes('returned')) return 'var(--bad)'
+  if (l.includes('pending') || l.includes('info') || l.includes('hold')) return 'var(--warn)'
+  return 'var(--muted)'
+}
+
 function fmtLastChecked(ts: number | undefined): string {
   if (!ts) return 'never'
   const diffMin = Math.round((Date.now() - ts) / 60000)
@@ -415,8 +424,17 @@ export default function AllOrders({
                     </td>
                   )}
                   {visibleCols.has('courier') && <td>{o.courier || '—'}</td>}
-                  {visibleCols.has('status') && <td>{prettyStatus(o.status) || '—'}</td>}
-                  {visibleCols.has('days_in_transit') && <td className="col-num" style={{ fontWeight: 600 }}>{o.days_in_transit ?? '—'}</td>}
+                  {visibleCols.has('status') && (
+                    <td>
+                      {prettyStatus(o.status)
+                        ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, color: statusColor(prettyStatus(o.status)) }}>
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor(prettyStatus(o.status)) }} />
+                            {prettyStatus(o.status)}
+                          </span>
+                        : '—'}
+                    </td>
+                  )}
+                  {visibleCols.has('days_in_transit') && <td className="col-num" style={{ fontWeight: 700, color: (o.days_in_transit ?? 0) >= 13 ? 'var(--warn)' : 'var(--text)' }}>{o.days_in_transit ?? '—'}</td>}
                   {visibleCols.has('issue_category') && (
                     <td>
                       {o.issue_category
