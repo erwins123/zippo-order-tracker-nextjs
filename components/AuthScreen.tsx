@@ -45,11 +45,11 @@ export default function AuthScreen({ theme, toggleTheme }: Props) {
         {/* Logo / brand */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <div style={{
-            width: 48, height: 48, borderRadius: 14, background: '#6366f1',
+            width: 48, height: 48, borderRadius: 14, background: '#c5f02e',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             marginBottom: 14,
           }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2} strokeLinecap="round">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1a1916" strokeWidth={2} strokeLinecap="round">
               <path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
               <path d="M16 3H8L6 7h12l-2-4z"/>
               <path d="M12 12v4M10 14h4"/>

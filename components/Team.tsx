@@ -27,38 +27,63 @@ export default function Team({ currentUserId, onAddLog }: Props) {
   }
 
   return (
-    <div className="section view-enter">
-      <h2>Team <span style={{ fontWeight: 400, color: '#9ca3af' }}>— admin only: manage who can sign in and their role</span></h2>
-      <p className="sub" style={{ marginBottom: 14 }}>
-        To add or remove a teammate's login entirely, do that in Supabase → Authentication → Users.
-        Here you can promote/demote existing teammates between <b>admin</b> and <b>member</b>.
-      </p>
-      <div className="tablewrap">
-        <table>
-          <thead><tr><th>Email</th><th>Role</th><th>Joined</th></tr></thead>
-          <tbody>
-            {profiles.map(p => {
-              const isMe = p.id === currentUserId
-              return (
-                <tr key={p.id}>
-                  <td>{p.email || '—'}{isMe && <span style={{ color: 'var(--muted)', fontSize: 11 }}> (you)</span>}</td>
-                  <td>
-                    <select
-                      defaultValue={p.role || 'member'}
-                      disabled={isMe}
-                      title={isMe ? "You can't change your own role" : undefined}
-                      onChange={e => changeRole(p.id, e.target.value)}
-                    >
-                      <option value="member">Member</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                  </td>
-                  <td>{p.created_at ? new Date(p.created_at).toLocaleDateString() : '—'}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+    <div className="view-enter">
+      <div className="section" style={{ marginBottom: 16 }}>
+        <h2>Team <span style={{ fontWeight: 400, color: 'var(--muted)' }}>— admin only: manage who can sign in and their role</span></h2>
+        <p className="sub" style={{ marginBottom: 0 }}>
+          To add or remove a teammate&apos;s login entirely, do that in Supabase → Authentication → Users.
+          Here you can promote/demote existing teammates between <b>admin</b> and <b>member</b>.
+        </p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 13 }}>
+        {profiles.map(p => {
+          const isMe = p.id === currentUserId
+          const isAdmin = (p.role || 'member') === 'admin'
+          return (
+            <div
+              key={p.id}
+              className="card"
+              style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
+                <div style={{
+                  width: 42, height: 42, borderRadius: '50%', flexShrink: 0,
+                  background: isAdmin ? 'var(--accent)' : 'var(--surface-2)',
+                  color: isAdmin ? 'var(--surface)' : 'var(--text)',
+                  border: isAdmin ? 'none' : '1px solid var(--border)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 16, fontWeight: 800,
+                }}>
+                  {(p.email || '?').charAt(0).toUpperCase()}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {p.email || '—'}
+                    {isMe && <span style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 500 }}> (you)</span>}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
+                    Joined {p.created_at ? new Date(p.created_at).toLocaleDateString() : '—'}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 700 }}>Role</span>
+                <select
+                  defaultValue={p.role || 'member'}
+                  disabled={isMe}
+                  title={isMe ? "You can't change your own role" : undefined}
+                  onChange={e => changeRole(p.id, e.target.value)}
+                  style={{ marginLeft: 'auto', minWidth: 120 }}
+                >
+                  <option value="member">Member</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

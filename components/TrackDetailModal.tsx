@@ -103,15 +103,15 @@ export default function TrackDetailModal({ order, orders, onClose, onEdit, onWri
             {!loading && liveResult && !liveResult.ok && (
               <div>
                 <span style={{ color: 'var(--bad)' }}>
-                  AfterShip couldn't return live data right now — the daily API quota (100 calls/day on the free plan) may be used up, or the tracking number isn't registered yet. Try again tomorrow, or check the carrier directly:
+                  AfterShip couldn&apos;t return live data right now — the daily API quota (100 calls/day on the free plan) may be used up, or the tracking number isn&apos;t registered yet. Try again tomorrow, or check the carrier directly:
                 </span>
                 <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <a href={`https://t.17track.net/en#nums=${encodeURIComponent(order.tracking_num || '')}`} target="_blank" rel="noopener noreferrer"
-                    style={{ display: 'inline-block', padding: '6px 14px', borderRadius: 8, background: 'var(--accent-soft)', color: 'var(--accent-2)', fontSize: 12.5, textDecoration: 'none', border: '1px solid var(--border)' }}>
+                    style={{ display: 'inline-block', padding: '6px 14px', borderRadius: 8, background: 'var(--accent-soft)', color: 'var(--accent-text)', fontSize: 12.5, textDecoration: 'none', border: '1px solid var(--border)' }}>
                     Open in 17TRACK ↗
                   </a>
                   <a href={`https://track.aftership.com/${encodeURIComponent(order.tracking_num || '')}`} target="_blank" rel="noopener noreferrer"
-                    style={{ display: 'inline-block', padding: '6px 14px', borderRadius: 8, background: 'var(--accent-soft)', color: 'var(--accent-2)', fontSize: 12.5, textDecoration: 'none', border: '1px solid var(--border)' }}>
+                    style={{ display: 'inline-block', padding: '6px 14px', borderRadius: 8, background: 'var(--accent-soft)', color: 'var(--accent-text)', fontSize: 12.5, textDecoration: 'none', border: '1px solid var(--border)' }}>
                     Open in AfterShip ↗
                   </a>
                 </div>
@@ -136,18 +136,35 @@ export default function TrackDetailModal({ order, orders, onClose, onEdit, onWri
 
           {events.length > 0 && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, fontSize: 12, margin: '14px 0 6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 700, fontSize: 12, margin: '16px 0 12px' }}>
                 <span>Full tracking history</span>
                 <button type="button" style={{ fontSize: 11, padding: '3px 9px' }} onClick={handleTranslate} disabled={translating}>
                   {translating ? '⌛ Translating…' : translated ? '🔤 Show original' : '🌐 Translate to English'}
                 </button>
               </div>
-              {events.map((ev, i) => (
-                <div key={i} className="logentry">
-                  <div className="t">{ev.time || '—'}{ev.location ? ' · ' + ev.location : ''}</div>
-                  {translated ? (ev._tr || ev.message || '—') : (ev.message || '—')}
-                </div>
-              ))}
+              {/* Vertical timeline */}
+              <div>
+                {events.map((ev, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 12 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <span style={{
+                        width: 11, height: 11, borderRadius: '50%', flexShrink: 0, marginTop: 3,
+                        background: i === 0 ? 'var(--accent)' : 'var(--surface)',
+                        border: `2px solid ${i === 0 ? 'var(--accent)' : 'var(--border-2)'}`,
+                      }} />
+                      {i < events.length - 1 && <span style={{ width: 2, flex: 1, background: 'var(--border)', minHeight: 18 }} />}
+                    </div>
+                    <div style={{ paddingBottom: 16, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: i === 0 ? 'var(--text)' : 'var(--text-2)' }}>
+                        {translated ? (ev._tr || ev.message || '—') : (ev.message || '—')}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}>
+                        {ev.time || '—'}{ev.location ? ' · ' + ev.location : ''}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
           {!loading && liveResult?.ok && events.length === 0 && (
