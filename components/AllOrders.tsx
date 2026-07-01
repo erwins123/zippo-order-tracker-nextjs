@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef } from 'react'
-import type { Order } from '@/lib/types'
+import type { Order, NavIntent } from '@/lib/types'
 import { normStatusKey } from '@/lib/autoFlag'
 import { prettyStatus, friendlyStatus, statusColor } from '@/lib/status'
 import Pagination from './ui/Pagination'
@@ -44,6 +44,7 @@ type SortDir = 1 | -1
 
 type Props = {
   orders: Order[]
+  nav?: NavIntent | null
   lastLiveCheck: Record<string, number>
   allStoreNames: string[]
   userEmail: string
@@ -58,7 +59,7 @@ type Props = {
 }
 
 export default function AllOrders({
-  orders, lastLiveCheck, allStoreNames, userEmail,
+  orders, nav, lastLiveCheck, allStoreNames, userEmail,
   onAddOrder, onEditOrder, onDeleteOrder, onOpenTracking,
   onVerifyAll, onManageStores, onBulkDelete, onBulkUpdateStatus,
 }: Props) {
@@ -89,6 +90,16 @@ export default function AllOrders({
       }
     } catch {}
   }, [userEmail])
+
+  // Apply a drill-down intent from the Dashboard (e.g. "Delivered" card).
+  useEffect(() => {
+    if (!nav) return
+    if (nav.store !== undefined) setStoreFilter(nav.store)
+    if (nav.status !== undefined) setStatusFilter(nav.status)
+    if (nav.search !== undefined) setSearch(nav.search)
+    if (nav.hideDelivered !== undefined) setAndPersistHideDelivered(nav.hideDelivered)
+    setPage(1)
+  }, [nav])
 
   // Close column panel on outside click
   useEffect(() => {

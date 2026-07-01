@@ -1,6 +1,6 @@
 'use client'
 
-import type { Order } from '@/lib/types'
+import type { Order, NavIntent } from '@/lib/types'
 import { normStatusKey } from '@/lib/autoFlag'
 import { prettyStatus, statusColor } from '@/lib/status'
 
@@ -38,7 +38,7 @@ function HBar({ label, count, max, color, onClick }: {
 
 type Props = {
   orders: Order[]
-  onNavigate: (tab: string, store?: string) => void
+  onNavigate: (tab: string, nav?: NavIntent) => void
 }
 
 export default function Dashboard({ orders, onNavigate }: Props) {
@@ -50,15 +50,15 @@ export default function Dashboard({ orders, onNavigate }: Props) {
   const delivered = orders.filter(o => normStatusKey(o.status) === 'delivered').length
   const transit   = orders.filter(o => normStatusKey(o.status) === 'intransit').length
 
-  const cards = [
-    { n: orders.length,   l: 'Total orders',          cls: 'gray',  tab: 'allorders' },
-    { n: delivered,       l: 'Delivered',              cls: 'green', tab: 'allorders' },
-    { n: transit,         l: 'In transit',             cls: 'blue',  tab: 'allorders' },
-    { n: flagged.length,  l: 'Flagged — needs review', cls: 'red',   tab: 'issues'    },
-    { n: open.length,     l: 'Open issues',            cls: 'red',   tab: 'issues'    },
-    { n: resolved.length, l: 'Resolved',               cls: 'green', tab: 'issues'    },
-    { n: counts['DELAYED']   || 0, l: 'Delayed',       cls: 'amber', tab: 'issues'    },
-    { n: counts['NOT FOUND'] || 0, l: 'Not found',     cls: 'amber', tab: 'issues'    },
+  const cards: { n: number; l: string; cls: string; tab: string; nav: NavIntent }[] = [
+    { n: orders.length,   l: 'Total orders',          cls: 'gray',  tab: 'allorders', nav: { store: '' } },
+    { n: delivered,       l: 'Delivered',              cls: 'green', tab: 'allorders', nav: { store: '', status: 'Delivered', hideDelivered: false } },
+    { n: transit,         l: 'In transit',             cls: 'blue',  tab: 'allorders', nav: { store: '', status: 'InTransit' } },
+    { n: flagged.length,  l: 'Flagged — needs review', cls: 'red',   tab: 'issues',    nav: {} },
+    { n: open.length,     l: 'Open issues',            cls: 'red',   tab: 'issues',    nav: { triage: '__open__' } },
+    { n: resolved.length, l: 'Resolved',               cls: 'green', tab: 'issues',    nav: { triage: 'resolved' } },
+    { n: counts['DELAYED']   || 0, l: 'Delayed',       cls: 'amber', tab: 'issues',    nav: { type: 'DELAYED' } },
+    { n: counts['NOT FOUND'] || 0, l: 'Not found',     cls: 'amber', tab: 'issues',    nav: { type: 'NOT FOUND' } },
   ]
 
   const stores = [...new Set(orders.map(o => o.store_name))].filter(Boolean).sort() as string[]
@@ -91,7 +91,7 @@ export default function Dashboard({ orders, onNavigate }: Props) {
     <div className="view-enter">
       <div className="cards">
         {cards.map((c, i) => (
-          <div key={i} className={`card ${c.cls} clickable`} onClick={() => onNavigate(c.tab)}>
+          <div key={i} className={`card ${c.cls} clickable`} onClick={() => onNavigate(c.tab, c.nav)}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 }}>
               <span style={{ width: 9, height: 9, borderRadius: 3, background: dotColor(c.cls) }} />
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.45 }}>
@@ -122,7 +122,7 @@ export default function Dashboard({ orders, onNavigate }: Props) {
               count={d.count}
               max={maxIssues}
               color={d.count >= 5 ? 'var(--bad)' : d.count >= 3 ? 'var(--warn)' : 'var(--accent)'}
-              onClick={() => onNavigate('issues', d.store)}
+              onClick={() => onNavigate('issues', { store: d.store })}
             />
           ))}
         </div>
@@ -171,7 +171,7 @@ export default function Dashboard({ orders, onNavigate }: Props) {
                 return (
                   <tr
                     key={s}
-                    onClick={() => onNavigate('issues', s)}
+                    onClick={() => onNavigate('issues', { store: s })}
                     style={{ cursor: 'pointer' }}
                     title={`View issues for ${s}`}
                   >

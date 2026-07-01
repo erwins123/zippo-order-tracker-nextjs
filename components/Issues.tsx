@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect } from 'react'
-import type { Order } from '@/lib/types'
+import type { Order, NavIntent } from '@/lib/types'
 import Pagination from './ui/Pagination'
 
 const PAGE_SIZE = 50
@@ -42,8 +42,7 @@ function statusLabel(s: string | null) { return STATUS_LABELS[s || ''] || s || '
 type Props = {
   orders: Order[]
   userEmail: string
-  navStore?: string
-  navSearch?: string
+  nav?: NavIntent | null
   allStoreNames: string[]
   onUpdateOrder: (id: string, patch: Partial<Order>) => Promise<void>
   onAddLog: (text: string) => Promise<void>
@@ -55,7 +54,7 @@ type Props = {
 }
 
 export default function Issues({
-  orders, navStore, navSearch, onUpdateOrder, onAddLog, onRunAutoFlag,
+  orders, nav, onUpdateOrder, onAddLog, onRunAutoFlag,
   onManageStores, onOpenTracking, onBulkDelete, onBulkSetMyStatus,
 }: Props) {
   const [storeFilter, setStoreFilter] = useState('')
@@ -67,15 +66,16 @@ export default function Issues({
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
-  // Jump to a store when navigating from Dashboard
+  // Apply a drill-down intent (Dashboard card, Stores card, or email deep-link).
+  // A new object is passed on every navigation, so this re-fires each time.
   useEffect(() => {
-    if (navStore) { setStoreFilter(navStore); setPage(1) }
-  }, [navStore])
-
-  // Jump to a specific order when navigating from the weekly email
-  useEffect(() => {
-    if (navSearch) { setSearch(navSearch); setPage(1) }
-  }, [navSearch])
+    if (!nav) return
+    if (nav.store !== undefined) setStoreFilter(nav.store)
+    if (nav.type !== undefined) setTypeFilter(nav.type)
+    if (nav.triage !== undefined) setStatusFilter(nav.triage)
+    if (nav.search !== undefined) setSearch(nav.search)
+    setPage(1)
+  }, [nav])
   const [autoFlagStatus, setAutoFlagStatus] = useState('')
   const [saveHint, setSaveHint] = useState(false)
   const saveHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null)

@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { normStatusKey, isAutoFlag, computeAutoFlag, AUTO_FLAG, MANUAL_STATUS_LOCK } from '@/lib/autoFlag'
 import { track17Lookup } from '@/lib/tracking'
 import { orderMonthKey, monthLabel, availableMonths } from '@/lib/month'
-import type { Order, LogEntry, TrackResult } from '@/lib/types'
+import type { Order, LogEntry, TrackResult, NavIntent } from '@/lib/types'
 import Sidebar from './Sidebar'
 import AuthScreen from './AuthScreen'
 import Dashboard from './Dashboard'
@@ -52,10 +52,11 @@ export default function AppShell() {
   const [liveBadge, setLiveBadge] = useState('')
   const [scanToastData, setScanToastData] = useState<ScanToastData>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [issueNavStore, setIssueNavStore] = useState('')
-  const [issueNavSearch, setIssueNavSearch] = useState('')
+  const [issuesNav, setIssuesNav] = useState<NavIntent | null>(null)
+  const [allOrdersNav, setAllOrdersNav] = useState<NavIntent | null>(null)
   const [monthFilter, setMonthFilter] = useState('') // '' = all time, else 'YYYY-MM'
   const [navBack, setNavBack] = useState<{ tab: Tab; label: string } | null>(null)
+  const [editReturnOrder, setEditReturnOrder] = useState<Order | null>(null)
 
   // Modal states
   const [orderModal, setOrderModal] = useState<{ open: boolean; order: ModalOrder }>({ open: false, order: null })
@@ -95,7 +96,7 @@ export default function AppShell() {
     const tab = params.get('tab')
     const q = params.get('q')
     if (tab && PAGE_TITLES[tab as Tab]) setActiveTab(tab as Tab)
-    if (q) setIssueNavSearch(q)
+    if (q) setIssuesNav({ search: q })
     if (tab || q) window.history.replaceState({}, '', window.location.pathname)
   }, [])
 
@@ -425,7 +426,7 @@ export default function AppShell() {
     <div className="app-shell">
       <Sidebar
         activeTab={activeTab}
-        onTabChange={tab => { setActiveTab(tab); setNavBack(null) }}
+        onTabChange={tab => { setActiveTab(tab); setNavBack(null); setIssuesNav(null); setAllOrdersNav(null) }}
         userEmail={currentUser.email}
         currentRole={currentRole}
         theme={theme}
@@ -487,21 +488,23 @@ export default function AppShell() {
           {activeTab === 'dashboard' && (
             <Dashboard
               orders={visibleOrders}
-              onNavigate={(tab, store) => {
+              onNavigate={(tab, intent) => {
                 setActiveTab(tab as Tab)
-                if (store) { setIssueNavStore(store); setNavBack({ tab: 'dashboard', label: 'Dashboard' }) }
-                else setNavBack(null)
+                setIssuesNav(tab === 'issues' ? (intent ?? {}) : null)
+                setAllOrdersNav(tab === 'allorders' ? (intent ?? {}) : null)
+                setNavBack({ tab: 'dashboard', label: 'Dashboard' })
               }}
             />
           )}
           {activeTab === 'allorders' && (
             <AllOrders
               orders={visibleOrders}
+              nav={allOrdersNav}
               lastLiveCheck={lastLiveCheck}
               allStoreNames={allStoreNames()}
               userEmail={currentUser.email}
-              onAddOrder={() => setOrderModal({ open: true, order: null })}
-              onEditOrder={o => setOrderModal({ open: true, order: o })}
+              onAddOrder={() => { setEditReturnOrder(null); setOrderModal({ open: true, order: null }) }}
+              onEditOrder={o => { setEditReturnOrder(null); setOrderModal({ open: true, order: o }) }}
               onDeleteOrder={deleteOrder}
               onOpenTracking={o => setTrackDetailOrder(o)}
               onVerifyAll={() => { setVerifyOpen(true); if (!verifyRunning) runVerifyAll() }}
@@ -514,8 +517,7 @@ export default function AppShell() {
             <Issues
               orders={visibleOrders}
               userEmail={currentUser.email}
-              navStore={issueNavStore}
-              navSearch={issueNavSearch}
+              nav={issuesNav}
               onUpdateOrder={updateOrder}
               onAddLog={addLog}
               onRunAutoFlag={async () => { await runAutoFlag(false) }}
@@ -530,7 +532,7 @@ export default function AppShell() {
             <Stores
               orders={visibleOrders}
               monthLabel={monthFilter ? monthLabel(monthFilter) : 'All time'}
-              onNavigate={store => { setActiveTab('issues'); setIssueNavStore(store); setNavBack({ tab: 'stores', label: 'Stores' }) }}
+              onNavigate={store => { setActiveTab('issues'); setIssuesNav({ store }); setAllOrdersNav(null); setNavBack({ tab: 'stores', label: 'Stores' }) }}
             />
           )}
           {activeTab === 'log' && <ActivityLog logRows={logRows} />}
@@ -544,7 +546,10 @@ export default function AppShell() {
         open={orderModal.open}
         order={orderModal.order}
         allStoreNames={allStoreNames()}
-        onClose={() => setOrderModal({ open: false, order: null })}
+        onClose={() => {
+          setOrderModal({ open: false, order: null })
+          if (editReturnOrder) { setTrackDetailOrder(editReturnOrder); setEditReturnOrder(null) }
+        }}
         onSave={async (payload, isEdit) => {
           if (isEdit && orderModal.order) {
             await updateOrder(orderModal.order.id, payload)
@@ -554,6 +559,7 @@ export default function AppShell() {
             if (saved) await addLog(`${payload.store_name} · ${payload.customer || '—'} (${payload.tracking_num || '—'}): new order added`)
           }
           setOrderModal({ open: false, order: null })
+          if (editReturnOrder) { setTrackDetailOrder(editReturnOrder); setEditReturnOrder(null) }
         }}
         onManageStores={() => setStoreManageOpen(true)}
       />
@@ -588,7 +594,7 @@ export default function AppShell() {
           order={trackDetailOrder}
           orders={orders}
           onClose={() => setTrackDetailOrder(null)}
-          onEdit={o => { setTrackDetailOrder(null); setOrderModal({ open: true, order: o }) }}
+          onEdit={o => { setEditReturnOrder(o); setTrackDetailOrder(null); setOrderModal({ open: true, order: o }) }}
           onWriteBack={writeLiveResultBack}
           onRefreshAutoFlag={refreshAutoFlagForOrder}
           recordLastChecked={recordLastChecked}

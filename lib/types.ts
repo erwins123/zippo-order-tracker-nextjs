@@ -20,6 +20,18 @@ export type Order = {
   issue_emailed_at: string | null
 }
 
+// Filters carried when drilling from one screen into another (Dashboard card /
+// Stores card / email deep-link). Only the fields relevant to the target page
+// are read; a fresh object is passed on every navigation so effects re-fire.
+export type NavIntent = {
+  store?: string    // All orders + Issues: store_name filter
+  search?: string   // All orders + Issues: search box
+  status?: string   // All orders: raw status filter
+  type?: string     // Issues: issue_category filter
+  triage?: string   // Issues: my_status (triage) filter
+  hideDelivered?: boolean // All orders: override the hide-delivered toggle
+}
+
 export type Profile = {
   id: string
   email: string | null
