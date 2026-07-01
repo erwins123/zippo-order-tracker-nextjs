@@ -1,6 +1,6 @@
 'use client'
 
-type Tab = 'dashboard' | 'allorders' | 'issues' | 'log' | 'team'
+type Tab = 'dashboard' | 'allorders' | 'issues' | 'stores' | 'log' | 'team'
 
 type Props = {
   activeTab: Tab
@@ -21,6 +21,7 @@ const TAB_LABELS: Record<Tab, string> = {
   dashboard: 'Dashboard',
   allorders: 'All orders',
   issues: 'Issues',
+  stores: 'Stores',
   log: 'Activity log',
   team: 'Team',
 }
@@ -35,6 +36,8 @@ function NavIcon({ tab }: { tab: Tab }) {
       return <svg viewBox="0 0 24 24" fill="none" stroke={s} strokeWidth={w}><path d="M4 6h16M4 10h16M4 14h10M4 18h7" strokeLinecap="round"/></svg>
     case 'issues':
       return <svg viewBox="0 0 24 24" fill="none" stroke={s} strokeWidth={w}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    case 'stores':
+      return <svg viewBox="0 0 24 24" fill="none" stroke={s} strokeWidth={w}><path d="M3 9l1.5-5.5A1 1 0 015.46 3h13.08a1 1 0 01.96.5L21 9M3 9v10a2 2 0 002 2h14a2 2 0 002-2V9M3 9h18M8 9v3a2 2 0 01-4 0M12 9v3a2 2 0 01-4 0M16 9v3a2 2 0 01-4 0M20 9v3a2 2 0 01-4 0" strokeLinecap="round" strokeLinejoin="round"/></svg>
     case 'log':
       return <svg viewBox="0 0 24 24" fill="none" stroke={s} strokeWidth={w}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
     case 'team':
@@ -46,7 +49,7 @@ export default function Sidebar({
   activeTab, onTabChange, userEmail, currentRole, theme, toggleTheme,
   onSignOut, openIssueCount, mobileOpen, onCloseMobile, liveBadge, onOpenVerify,
 }: Props) {
-  const tabs: Tab[] = ['dashboard', 'allorders', 'issues', 'log', ...(currentRole === 'admin' ? ['team' as Tab] : [])]
+  const tabs: Tab[] = ['dashboard', 'allorders', 'issues', 'stores', 'log', ...(currentRole === 'admin' ? ['team' as Tab] : [])]
 
   return (
     <>

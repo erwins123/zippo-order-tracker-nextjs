@@ -1,15 +1,17 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { normStatusKey, isAutoFlag, computeAutoFlag, AUTO_FLAG, MANUAL_STATUS_LOCK } from '@/lib/autoFlag'
 import { track17Lookup } from '@/lib/tracking'
+import { orderMonthKey, monthLabel, availableMonths } from '@/lib/month'
 import type { Order, LogEntry, TrackResult } from '@/lib/types'
 import Sidebar from './Sidebar'
 import AuthScreen from './AuthScreen'
 import Dashboard from './Dashboard'
 import AllOrders from './AllOrders'
 import Issues from './Issues'
+import Stores from './Stores'
 import ActivityLog from './ActivityLog'
 import Team from './Team'
 import OrderModal from './OrderModal'
@@ -23,7 +25,7 @@ const STORE_LIST_KEY = 'order_tracker_store_names'
 const LAST_CHECKED_KEY = 'order_tracker_last_live_check'
 const SCAN_COOLDOWN_MS = 12 * 60 * 60 * 1000
 
-type Tab = 'dashboard' | 'allorders' | 'issues' | 'log' | 'team'
+type Tab = 'dashboard' | 'allorders' | 'issues' | 'stores' | 'log' | 'team'
 
 export type ModalOrder = Order | null
 export type ScanToastData = { ts: number; by: string } | null
@@ -32,6 +34,7 @@ const PAGE_TITLES: Record<Tab, string> = {
   dashboard: 'Dashboard',
   allorders: 'All orders',
   issues: 'Issues',
+  stores: 'Stores',
   log: 'Activity log',
   team: 'Team',
 }
@@ -51,6 +54,7 @@ export default function AppShell() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [issueNavStore, setIssueNavStore] = useState('')
   const [issueNavSearch, setIssueNavSearch] = useState('')
+  const [monthFilter, setMonthFilter] = useState('') // '' = all time, else 'YYYY-MM'
 
   // Modal states
   const [orderModal, setOrderModal] = useState<{ open: boolean; order: ModalOrder }>({ open: false, order: null })
@@ -399,11 +403,22 @@ export default function AppShell() {
     return a.localeCompare(b)
   }
 
+  // ----- Global month filter -----
+  const monthOptions = useMemo(() => availableMonths(orders), [orders])
+  const visibleOrders = useMemo(
+    () => monthFilter ? orders.filter(o => orderMonthKey(o.date_added) === monthFilter) : orders,
+    [orders, monthFilter]
+  )
+
   if (!currentUser) {
     return <AuthScreen theme={theme} toggleTheme={toggleTheme} />
   }
 
-  const openIssueCount = orders.filter(o => o.has_issue && o.my_status !== 'resolved').length
+  const openIssueCount = visibleOrders.filter(o => o.has_issue && o.my_status !== 'resolved').length
+  const storeCount = new Set(visibleOrders.map(o => o.store_name).filter(Boolean)).size
+  const subheadText = orders.length === 0
+    ? subhead
+    : `${visibleOrders.length} orders · ${storeCount} stores · ${openIssueCount} open issues${monthFilter ? ` · ${monthLabel(monthFilter)}` : ''}`
 
   return (
     <div className="app-shell">
@@ -437,18 +452,27 @@ export default function AppShell() {
               {openIssueCount} open
             </span>
           )}
+          <select
+            value={monthFilter}
+            onChange={e => setMonthFilter(e.target.value)}
+            title="Filter every page by month"
+            style={{ marginLeft: 'auto', fontSize: 12.5, fontWeight: 600 }}
+          >
+            <option value="">All time</option>
+            {monthOptions.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
+          </select>
         </div>
 
         <div className="stat-strip">
           <span className="live-dot" />
-          <span>{subhead}</span>
+          <span>{subheadText}</span>
           <span style={{ marginLeft: 'auto', color: '#22c55e', fontWeight: 500, fontSize: 11 }}>live · synced with your team</span>
         </div>
 
         <div className="page-content">
           {activeTab === 'dashboard' && (
             <Dashboard
-              orders={orders}
+              orders={visibleOrders}
               onNavigate={(tab, store) => {
                 setActiveTab(tab as Tab)
                 if (store) setIssueNavStore(store)
@@ -457,7 +481,7 @@ export default function AppShell() {
           )}
           {activeTab === 'allorders' && (
             <AllOrders
-              orders={orders}
+              orders={visibleOrders}
               lastLiveCheck={lastLiveCheck}
               allStoreNames={allStoreNames()}
               userEmail={currentUser.email}
@@ -473,7 +497,7 @@ export default function AppShell() {
           )}
           {activeTab === 'issues' && (
             <Issues
-              orders={orders}
+              orders={visibleOrders}
               userEmail={currentUser.email}
               navStore={issueNavStore}
               navSearch={issueNavSearch}
@@ -485,6 +509,13 @@ export default function AppShell() {
               allStoreNames={allStoreNames()}
               onBulkDelete={bulkDeleteOrders}
               onBulkSetMyStatus={(ids, status) => bulkUpdateOrders(ids, { my_status: status })}
+            />
+          )}
+          {activeTab === 'stores' && (
+            <Stores
+              orders={visibleOrders}
+              monthLabel={monthFilter ? monthLabel(monthFilter) : 'All time'}
+              onNavigate={store => { setActiveTab('issues'); setIssueNavStore(store) }}
             />
           )}
           {activeTab === 'log' && <ActivityLog logRows={logRows} />}
