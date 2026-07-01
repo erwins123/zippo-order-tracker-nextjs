@@ -2,24 +2,7 @@
 
 import type { Order } from '@/lib/types'
 import { normStatusKey } from '@/lib/autoFlag'
-
-const STATUS_PRETTY: Record<string, string> = {
-  intransit: 'In Transit', delivered: 'Delivered', notfound: 'Not Found',
-  pending: 'Pending', inforeceived: 'Info Received', exception: 'Exception',
-  outfordelivery: 'Out for Delivery', alert: 'Alert', alertreturned: 'Alert / Returned',
-  undelivered: 'Undelivered', canceled: 'Canceled', cancelled: 'Cancelled',
-  onhold: 'On Hold', returnedtosender: 'Returned to Sender',
-}
-function prettyStatus(s: string | null) { return STATUS_PRETTY[normStatusKey(s)] || s || 'Unknown' }
-
-function statusColor(label: string): string {
-  const l = label.toLowerCase()
-  if (l.includes('deliver') && !l.includes('out')) return 'var(--good)'
-  if (l.includes('transit') || l.includes('out for')) return 'var(--info)'
-  if (l.includes('not found') || l.includes('exception') || l.includes('alert') || l.includes('undelivered') || l.includes('returned')) return 'var(--bad)'
-  if (l.includes('pending') || l.includes('info received') || l.includes('on hold')) return 'var(--warn)'
-  return 'var(--muted)'
-}
+import { prettyStatus, statusColor } from '@/lib/status'
 
 // Maps a stat-card color class to its accent variable (drives the dot)
 function dotColor(cls: string): string {
@@ -91,14 +74,18 @@ export default function Dashboard({ orders, onNavigate }: Props) {
     .slice(0, 10)
   const maxIssues = Math.max(...issueChartData.map(d => d.count), 1)
 
-  // Chart: orders by status
-  const statusMap: Record<string, number> = {}
+  // Chart: orders by status (grouped by raw status key so colors stay accurate)
+  const statusMap: Record<string, { label: string; count: number }> = {}
   orders.forEach(o => {
-    const label = prettyStatus(o.status)
-    statusMap[label] = (statusMap[label] || 0) + 1
+    const key = normStatusKey(o.status) || 'unknown'
+    if (!statusMap[key]) statusMap[key] = { label: prettyStatus(o.status) || 'Unknown', count: 0 }
+    statusMap[key].count++
   })
-  const statusChartData = Object.entries(statusMap).sort((a, b) => b[1] - a[1]).slice(0, 8)
-  const maxStatus = Math.max(...statusChartData.map(d => d[1]), 1)
+  const statusChartData = Object.entries(statusMap)
+    .map(([key, v]) => ({ key, ...v }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8)
+  const maxStatus = Math.max(...statusChartData.map(d => d.count), 1)
 
   return (
     <div className="view-enter">
@@ -142,13 +129,13 @@ export default function Dashboard({ orders, onNavigate }: Props) {
 
         <div className="section" style={{ marginBottom: 0 }}>
           <h2 style={{ marginBottom: 16 }}>Orders by status</h2>
-          {statusChartData.map(([label, count]) => (
+          {statusChartData.map(d => (
             <HBar
-              key={label}
-              label={label}
-              count={count}
+              key={d.key}
+              label={d.label}
+              count={d.count}
               max={maxStatus}
-              color={statusColor(label)}
+              color={statusColor(d.key)}
             />
           ))}
         </div>

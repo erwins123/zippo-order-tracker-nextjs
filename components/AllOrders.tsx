@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import type { Order } from '@/lib/types'
 import { normStatusKey } from '@/lib/autoFlag'
+import { prettyStatus, friendlyStatus, statusColor } from '@/lib/status'
 import Pagination from './ui/Pagination'
 
 const PAGE_SIZE = 50
@@ -25,24 +26,6 @@ const ALL_COLS = [
 ]
 const DEFAULT_VISIBLE = new Set(ALL_COLS.map(c => c.k))
 
-const STATUS_PRETTY: Record<string, string> = {
-  intransit: 'In Transit', delivered: 'Delivered', notfound: 'Not Found',
-  pending: 'Pending', inforeceived: 'Info Received', exception: 'Exception',
-  outfordelivery: 'Out for Delivery', alert: 'Alert', alertreturned: 'Alert / Returned',
-  undelivered: 'Undelivered', canceled: 'Canceled', cancelled: 'Cancelled',
-  updateerror: 'Update Error', registrationerror: 'Registration Error',
-  onhold: 'On Hold', returnedtosender: 'Returned to Sender',
-}
-function prettyStatus(s: string | null) { return STATUS_PRETTY[normStatusKey(s)] || s || '' }
-
-function statusColor(label: string): string {
-  const l = label.toLowerCase()
-  if (l.includes('deliver') && !l.includes('out')) return 'var(--good)'
-  if (l.includes('transit') || l.includes('out for')) return 'var(--info)'
-  if (l.includes('not found') || l.includes('exception') || l.includes('alert') || l.includes('undeliver') || l.includes('returned')) return 'var(--bad)'
-  if (l.includes('pending') || l.includes('info') || l.includes('hold')) return 'var(--warn)'
-  return 'var(--muted)'
-}
 
 function fmtLastChecked(ts: number | undefined): string {
   if (!ts) return 'never'
@@ -426,10 +409,10 @@ export default function AllOrders({
                   {visibleCols.has('courier') && <td>{o.courier || '—'}</td>}
                   {visibleCols.has('status') && (
                     <td>
-                      {prettyStatus(o.status)
-                        ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, color: statusColor(prettyStatus(o.status)) }}>
-                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor(prettyStatus(o.status)) }} />
-                            {prettyStatus(o.status)}
+                      {friendlyStatus(o)
+                        ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, color: statusColor(o.status) }}>
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor(o.status) }} />
+                            {friendlyStatus(o)}
                           </span>
                         : '—'}
                     </td>

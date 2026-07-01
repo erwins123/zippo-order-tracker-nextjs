@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import type { Order, TrackResult, TrackEvent } from '@/lib/types'
 import { track17Lookup, formatEstimatedDelivery } from '@/lib/tracking'
+import { friendlyStatus } from '@/lib/status'
 
 type Props = {
   order: Order
@@ -82,7 +83,13 @@ export default function TrackDetailModal({ order, orders, onClose, onEdit, onWri
           <span>Order #</span><span>{currentOrder.order_num || '—'}</span>
           <span>Date added</span><span>{currentOrder.date_added || '—'}</span>
           <span>Courier (stored)</span><span>{currentOrder.courier || '—'}</span>
-          <span>Status (stored)</span><span>{currentOrder.status || '—'}</span>
+          <span>Status (stored)</span>
+          <span>
+            {friendlyStatus(currentOrder) || '—'}
+            {currentOrder.status && friendlyStatus(currentOrder).toLowerCase() !== currentOrder.status.toLowerCase() && (
+              <span style={{ color: 'var(--muted)' }}> · {currentOrder.status}</span>
+            )}
+          </span>
           <span>Days (stored)</span><span>{currentOrder.days_in_transit ?? '—'}</span>
           <span>Latest update (stored)</span><span title={currentOrder.latest_update || ''}>{currentOrder.latest_update || '—'}</span>
         </div>
@@ -121,7 +128,10 @@ export default function TrackDetailModal({ order, orders, onClose, onEdit, onWri
               <div className="kv">
                 {liveResult.carrier && <><span>Carrier (live)</span><span>{liveResult.carrier}</span></>}
                 <span>Status (live)</span>
-                <span>{liveResult.status || '—'}{liveResult.sub_status ? ' / ' + liveResult.sub_status : ''}</span>
+                <span>
+                  {friendlyStatus({ status: liveResult.status, latest_update: liveResult.latest_event }) || '—'}
+                  <span style={{ color: 'var(--muted)' }}> · {liveResult.status || '—'}{liveResult.sub_status ? ' / ' + liveResult.sub_status : ''}</span>
+                </span>
                 <span>Days in transit (live)</span><span>{liveResult.days_of_transit ?? '—'}</span>
                 {formatEstimatedDelivery(liveResult.estimated_delivery) && (
                   <><span>Estimated delivery</span><span>{formatEstimatedDelivery(liveResult.estimated_delivery)}</span></>
