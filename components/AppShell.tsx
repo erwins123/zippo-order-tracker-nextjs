@@ -55,6 +55,7 @@ export default function AppShell() {
   const [issueNavStore, setIssueNavStore] = useState('')
   const [issueNavSearch, setIssueNavSearch] = useState('')
   const [monthFilter, setMonthFilter] = useState('') // '' = all time, else 'YYYY-MM'
+  const [navBack, setNavBack] = useState<{ tab: Tab; label: string } | null>(null)
 
   // Modal states
   const [orderModal, setOrderModal] = useState<{ open: boolean; order: ModalOrder }>({ open: false, order: null })
@@ -424,7 +425,7 @@ export default function AppShell() {
     <div className="app-shell">
       <Sidebar
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={tab => { setActiveTab(tab); setNavBack(null) }}
         userEmail={currentUser.email}
         currentRole={currentRole}
         theme={theme}
@@ -446,6 +447,19 @@ export default function AppShell() {
               <line x1="3" y1="18" x2="21" y2="18"/>
             </svg>
           </button>
+          {navBack && (
+            <button
+              className="btn-sm"
+              onClick={() => { const t = navBack.tab; setNavBack(null); setActiveTab(t) }}
+              style={{ marginRight: 2 }}
+              title={`Back to ${navBack.label}`}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+              {navBack.label}
+            </button>
+          )}
           <span className="main-header-title">{PAGE_TITLES[activeTab]}</span>
           {activeTab === 'issues' && openIssueCount > 0 && (
             <span className="main-header-badge" style={{ background: 'var(--bad-bg)', color: 'var(--bad)', border: '1px solid var(--bad-border)' }}>
@@ -475,7 +489,8 @@ export default function AppShell() {
               orders={visibleOrders}
               onNavigate={(tab, store) => {
                 setActiveTab(tab as Tab)
-                if (store) setIssueNavStore(store)
+                if (store) { setIssueNavStore(store); setNavBack({ tab: 'dashboard', label: 'Dashboard' }) }
+                else setNavBack(null)
               }}
             />
           )}
@@ -515,7 +530,7 @@ export default function AppShell() {
             <Stores
               orders={visibleOrders}
               monthLabel={monthFilter ? monthLabel(monthFilter) : 'All time'}
-              onNavigate={store => { setActiveTab('issues'); setIssueNavStore(store) }}
+              onNavigate={store => { setActiveTab('issues'); setIssueNavStore(store); setNavBack({ tab: 'stores', label: 'Stores' }) }}
             />
           )}
           {activeTab === 'log' && <ActivityLog logRows={logRows} />}
