@@ -74,15 +74,17 @@ export default function Dashboard({ orders, onNavigate }: Props) {
     .slice(0, 10)
   const maxIssues = Math.max(...issueChartData.map(d => d.count), 1)
 
-  // Chart: orders by status (grouped by raw status key so colors stay accurate)
-  const statusMap: Record<string, { label: string; count: number }> = {}
+  // Chart: orders by status. Grouped by display label — several raw tags can
+  // share one label (InfoReceived + Pending -> "Awaiting carrier scan") — while
+  // keeping a representative raw key so the color mapping stays accurate.
+  const statusMap: Record<string, { key: string; count: number }> = {}
   orders.forEach(o => {
-    const key = normStatusKey(o.status) || 'unknown'
-    if (!statusMap[key]) statusMap[key] = { label: prettyStatus(o.status) || 'Unknown', count: 0 }
-    statusMap[key].count++
+    const label = prettyStatus(o.status) || 'Unknown'
+    if (!statusMap[label]) statusMap[label] = { key: normStatusKey(o.status) || 'unknown', count: 0 }
+    statusMap[label].count++
   })
   const statusChartData = Object.entries(statusMap)
-    .map(([key, v]) => ({ key, ...v }))
+    .map(([label, v]) => ({ label, ...v }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 8)
   const maxStatus = Math.max(...statusChartData.map(d => d.count), 1)
@@ -131,7 +133,7 @@ export default function Dashboard({ orders, onNavigate }: Props) {
           <h2 style={{ marginBottom: 16 }}>Orders by status</h2>
           {statusChartData.map(d => (
             <HBar
-              key={d.key}
+              key={d.label}
               label={d.label}
               count={d.count}
               max={maxStatus}
